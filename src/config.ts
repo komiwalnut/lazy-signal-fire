@@ -10,7 +10,6 @@ export const KEY_FILE_PATH = path.join(process.cwd(), '.key');
 
 const requiredEnvVars = [
   'ENCRYPTION_KEY',
-  'WALLET_ADDRESS',
   'DRPC_ENDPOINT'
 ];
 
@@ -27,7 +26,6 @@ const DEFAULT_MAX_FEE = 2;
 
 export const config = {
   encryptionKey: process.env.ENCRYPTION_KEY as string,
-  walletAddress: process.env.WALLET_ADDRESS as string,
   drpcEndpoint: process.env.DRPC_ENDPOINT as string,
 
   roninRpcUrl: DEFAULT_RONIN_RPC_URL,

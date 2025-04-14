@@ -33,7 +33,7 @@ An automated blockchain transaction sender that periodically calls the `fire()` 
      ```
      node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
      ```
-   - Set your wallet address and drpc endpoint (follow instruction in `.env` file you just created)
+   - Set your dRPC endpoint (follow instruction in `.env` file you just created)
 
 ## Usage
 
