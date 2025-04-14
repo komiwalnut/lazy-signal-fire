@@ -91,7 +91,7 @@ To run the script automatically every 13 hours:
    ```
    Example:
    ```
-   0 */13 * * * cd /home/ec2-user/lazy-signal-fire && /usr/local/bin/pnpm >> /home/ec2-user/lazy-signal-fire/cron.log 2>&1
+   0 */13 * * * cd /home/ec2-user/lazy-signal-fire && /usr/local/bin/pnpm start >> /home/ec2-user/lazy-signal-fire/cron.log 2>&1
    ```
 
 5. Save and exit the editor:
