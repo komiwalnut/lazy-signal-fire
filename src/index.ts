@@ -3,6 +3,7 @@ import { encryptAndSaveKey } from './crypto';
 import { sendFireTransaction } from './transaction';
 import prompts from 'prompts';
 import { isTestMode } from './config';
+import { logger } from './logger';
 
 function isValidEthereumPrivateKey(key: string): boolean {
   const cleanKey = key.startsWith('0x') ? key.substring(2) : key;
@@ -12,16 +13,16 @@ function isValidEthereumPrivateKey(key: string): boolean {
 }
 
 async function main() {
-  console.log('🔥 Lazy Signal Fire 🔥');
-  console.log('------------------------');
+  logger.info('🔥 Lazy Signal Fire 🔥');
+  logger.info('------------------------');
 
   if (!keyFileExists()) {
-    console.log('No encrypted key file found. Setting up...');
+    logger.info('No encrypted key file found. Setting up...');
 
-    console.log('\n⚠️  SECURITY WARNING ⚠️');
-    console.log('Make sure no one can see your screen');
-    console.log('Your private key will be encrypted, but it\'s sensitive during input');
-    console.log('Press Ctrl+C to cancel if you\'re in a public place\n');
+    logger.warn('\n⚠️  SECURITY WARNING ⚠️');
+    logger.warn('Make sure no one can see your screen');
+    logger.warn('Your private key will be encrypted, but it\'s sensitive during input');
+    logger.warn('Press Ctrl+C to cancel if you\'re in a public place\n');
 
     const response = await prompts({
       type: 'password',
@@ -33,44 +34,43 @@ async function main() {
     });
     
     if (!response.privateKey) {
-      console.error('Operation cancelled or invalid input. Exiting...');
+      logger.error('Operation cancelled or invalid input. Exiting...');
       process.exit(1);
     }
     
     try {
       encryptAndSaveKey(response.privateKey);
-      console.log('Key encrypted and saved successfully!');
+      logger.info('Key encrypted and saved successfully!');
     } catch (error) {
-      console.error('Failed to encrypt and save key:', error);
+      logger.error('Failed to encrypt and save key:', error);
       process.exit(1);
     } finally {
       response.privateKey = '';
     }
   }
   
-  console.log(`Mode: ${isTestMode ? 'TEST' : 'PRODUCTION'}`);
+  logger.info(`Mode: ${isTestMode ? 'TEST' : 'PRODUCTION'}`);
 
   try {
-    console.log('Executing fire() transaction...');
+    logger.info('Executing fire() transaction...');
     const txHash = await sendFireTransaction();
-    console.log(`Transaction completed with hash: ${txHash}`);
   } catch (error) {
-    console.error('Failed to execute transaction:', error);
+    logger.error('Failed to execute transaction:', error);
     process.exit(1);
   }
 }
 
 process.on('SIGINT', () => {
-  console.log('\nOperation cancelled. Exiting...');
+  logger.info('\nOperation cancelled. Exiting...');
   process.exit(0);
 });
 
 process.on('uncaughtException', (error) => {
-  console.error('Unhandled exception:', error);
+  logger.error('Unhandled exception:', error);
   process.exit(1);
 });
 
 main().catch((error) => {
-  console.error('Unhandled error:', error);
+  logger.error('Unhandled error:', error);
   process.exit(1);
 });
