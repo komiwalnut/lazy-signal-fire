@@ -1,0 +1,28 @@
+{
+    "name": "lazy-signal-fire",
+    "version": "1.0.0",
+    "description": "Automated blockchain transaction sender that calls the fire() function periodically",
+    "main": "dist/index.js",
+    "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node src/index.ts",
+    "test": "ts-node src/index.ts --test"
+  },
+  "keywords": ["blockchain", "ronin", "scheduler"],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.3.1",
+    "ethers": "^6.7.1",
+    "node-fetch": "^2.6.7",
+    "prompts": "^2.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.5.7",
+    "@types/node-fetch": "^2.6.4",
+    "@types/prompts": "^2.4.4",
+    "ts-node": "^10.9.1",
+    "typescript": "^5.2.2"
+  }
+}
