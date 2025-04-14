@@ -40,18 +40,16 @@ async function estimateGas(walletAddress: string, rpcUrl: string): Promise<bigin
     
     if (result.error) {
       logger.warn(`Gas estimation error: ${JSON.stringify(result.error)}`);
-      const bufferedDefault = DEFAULT_GAS * BigInt(110) / BigInt(100);
-      logger.warn(`Using default gas with 10% buffer: ${bufferedDefault}`);
-      return bufferedDefault;
+      logger.warn(`Using default gas: ${DEFAULT_GAS}`);
+      return DEFAULT_GAS;
     }
     
     const estimatedGas = BigInt(result.result);
     logger.info(`Estimated gas: ${estimatedGas}`);
     return estimatedGas;
   } catch (error) {
-    const bufferedDefault = DEFAULT_GAS * BigInt(110) / BigInt(100);
-    logger.warn(`Failed to estimate gas: ${error}. Using default with 10% buffer: ${bufferedDefault}`);
-    return bufferedDefault;
+    logger.warn(`Failed to estimate gas: ${error}. Using default: ${DEFAULT_GAS}`);
+    return DEFAULT_GAS;
   }
 }
 
