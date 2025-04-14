@@ -2,16 +2,21 @@ import { ethers } from 'ethers';
 import { config, isTestMode } from './config';
 import { loadAndDecryptKey } from './crypto';
 import fetch from 'node-fetch';
+import { logger } from './logger';
 
 const FIRE_FUNCTION = "0x457094cc";
+const MAX_RETRIES = 3;
+const RETRY_DELAY_MS = 5000;
+const CONFIRMATION_TIMEOUT_MS = 180000;
 
-const REASONABLE_GAS_LIMIT = 55000;
+const RPC_ENDPOINTS = [
+  { url: config.drpcEndpoint, name: "dRPC" },
+  { url: 'https://api.roninchain.com/rpc', name: "Ronin RPC" }
+];
 
-async function estimateGas(walletAddress: string): Promise<bigint> {
+async function estimateGas(walletAddress: string, rpcUrl: string): Promise<bigint> {
   try {
-    console.log('Estimating gas for transaction...');
-    
-    const response = await fetch(config.drpcEndpoint, {
+    const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -33,75 +38,173 @@ async function estimateGas(walletAddress: string): Promise<bigint> {
     const result = await response.json();
     
     if (result.error) {
-      console.error('Gas estimation error:', result.error);
+      logger.warn(`Gas estimation error: ${JSON.stringify(result.error)}`);
       throw new Error(`Gas estimation failed: ${result.error.message}`);
     }
     
     const estimatedGas = BigInt(result.result);
-    console.log(`RPC estimated gas: ${estimatedGas}`);
+    logger.info(`Estimated gas: ${estimatedGas}`);
 
-    if (estimatedGas > BigInt(REASONABLE_GAS_LIMIT)) {
-      console.log(`Using capped gas limit of ${REASONABLE_GAS_LIMIT} instead of ${estimatedGas}`);
-      return BigInt(REASONABLE_GAS_LIMIT);
-    }
-    
     return estimatedGas;
   } catch (error) {
-    console.error('Failed to estimate gas:', error);
-    console.log(`Using default gas limit of ${REASONABLE_GAS_LIMIT}`);
-    return BigInt(REASONABLE_GAS_LIMIT);
+    const defaultGas = BigInt(100000);
+    logger.warn(`Failed to estimate gas: ${error}. Using default: ${defaultGas}`);
+    return defaultGas;
   }
 }
 
-export async function sendFireTransaction(): Promise<string> {
+async function getTransactionReceipt(txHash: string, rpcUrl: string): Promise<any | null> {
   try {
-    const provider = new ethers.JsonRpcProvider(config.roninRpcUrl);
-
-    const privateKey = loadAndDecryptKey();
-
-    const wallet = new ethers.Wallet(privateKey, provider);
-    
-    console.log(`Using wallet: ${wallet.address}`);
-    console.log(`Preparing to call fire() on contract: ${config.contractAddress}`);
-
-    const nonce = await provider.getTransactionCount(wallet.address);
-    console.log(`Current nonce: ${nonce}`);
-
-    const gasLimit = await estimateGas(wallet.address);
-    
-    if (isTestMode) {
-      console.log('TEST MODE: Transaction not sent');
-      return 'test-transaction-hash';
-    }
-
-    const priorityFee = ethers.parseUnits(config.priorityFee.toString(), 'gwei');
-    const baseFee = ethers.parseUnits(config.maxFee.toString(), 'gwei');
-
-    const maxFeePerGas = priorityFee + baseFee;
-    
-    console.log(`Gas settings: priorityFee=${config.priorityFee} GWEI, baseFee=${config.maxFee} GWEI, maxFee=${Number(ethers.formatUnits(maxFeePerGas, 'gwei'))} GWEI`);
-
-    const tx = await wallet.sendTransaction({
-      to: config.contractAddress,
-      data: FIRE_FUNCTION,
-      gasLimit,
-      maxFeePerGas,
-      maxPriorityFeePerGas: priorityFee,
-      nonce
+    const response = await fetch(rpcUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        method: "eth_getTransactionReceipt",
+        params: [txHash],
+        id: 1,
+        jsonrpc: "2.0"
+      })
     });
     
-    console.log(`Transaction sent with hash: ${tx.hash}`);
-
-    const receipt = await tx.wait();
-    if (!receipt) {
-      throw new Error('Transaction receipt is null');
-    }
-    console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
-    console.log(`Gas used: ${receipt.gasUsed}`);
+    const result = await response.json();
     
-    return tx.hash;
+    if (result.error) {
+      logger.warn(`Error checking receipt: ${JSON.stringify(result.error)}`);
+      return null;
+    }
+    
+    return result.result;
   } catch (error) {
-    console.error('Error sending transaction:', error);
-    throw error;
+    logger.warn(`Failed to check transaction receipt: ${error}`);
+    return null;
   }
+}
+
+async function waitForTransaction(txHash: string, rpcUrl: string): Promise<any> {
+  logger.info(`Waiting for transaction ${txHash} to be mined...`);
+  
+  const startTime = Date.now();
+  let lastLog = startTime;
+  
+  while (Date.now() - startTime < CONFIRMATION_TIMEOUT_MS) {
+    try {
+      const receipt = await getTransactionReceipt(txHash, rpcUrl);
+      
+      if (receipt) {
+        const blockNumber = parseInt(receipt.blockNumber, 16);
+        const status = parseInt(receipt.status, 16);
+        const gasUsed = parseInt(receipt.gasUsed, 16);
+        
+        if (status === 1) {
+          logger.info(`Transaction confirmed in block ${blockNumber}! Gas used: ${gasUsed}`);
+        } else {
+          logger.warn(`Transaction was mined in block ${blockNumber} but failed with status: ${status}`);
+        }
+        
+        return receipt;
+      }
+
+      const now = Date.now();
+      if (now - lastLog > 15000) {
+        logger.info(`Still waiting for confirmation... (${Math.floor((now - startTime) / 1000)}s elapsed)`);
+        lastLog = now;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    } catch (error) {
+      logger.warn(`Error checking transaction status: ${error}`);
+      await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+  }
+  
+  logger.warn(`Transaction confirmation timed out after ${CONFIRMATION_TIMEOUT_MS / 1000} seconds`);
+  return null;
+}
+
+export async function sendFireTransaction(): Promise<string> {
+  let attemptCount = 0;
+  
+  while (attemptCount < MAX_RETRIES) {
+    for (const rpc of RPC_ENDPOINTS) {
+      try {
+        logger.info(`Transaction attempt ${attemptCount + 1} using ${rpc.name}`);
+
+        const provider = new ethers.JsonRpcProvider(rpc.url);
+        await provider.getBlockNumber();
+        
+        const privateKey = loadAndDecryptKey();
+        const wallet = new ethers.Wallet(privateKey, provider);
+        
+        logger.info(`Using wallet: ${wallet.address}`);
+
+        const nonce = await provider.getTransactionCount(wallet.address);
+
+        const gasLimit = await estimateGas(wallet.address, rpc.url);
+        
+        if (isTestMode) {
+          logger.info('TEST MODE: Transaction not sent');
+          return 'test-transaction-hash';
+        }
+
+        let txRequest;
+        
+        if (rpc.name === "dRPC") {
+          const priorityFee = ethers.parseUnits(config.priorityFee.toString(), 'gwei');
+          const baseFee = ethers.parseUnits(config.maxFee.toString(), 'gwei');
+          
+          txRequest = {
+            to: config.contractAddress,
+            data: FIRE_FUNCTION,
+            gasLimit,
+            maxFeePerGas: priorityFee + baseFee,
+            maxPriorityFeePerGas: priorityFee,
+            nonce
+          };
+        } else {
+          const gasPrice = ethers.parseUnits((config.priorityFee + config.maxFee).toString(), 'gwei');
+          
+          txRequest = {
+            to: config.contractAddress,
+            data: FIRE_FUNCTION,
+            gasLimit,
+            gasPrice,
+            nonce
+          };
+        }
+
+        logger.info('Sending transaction...');
+        const tx = await wallet.sendTransaction(txRequest);
+        logger.info(`Transaction sent with hash: ${tx.hash}`);
+
+        const receipt = await waitForTransaction(tx.hash, rpc.url);
+        
+        if (!receipt) {
+          logger.warn('Could not confirm if transaction was mined, but it was submitted');
+          logger.warn('Will assume transaction is successful since it was properly sent to the network');
+        }
+        
+        return tx.hash;
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        logger.warn(`Failed with ${rpc.name}: ${errorMessage}`);
+        
+        continue;
+      }
+    }
+    
+    attemptCount++;
+    
+    if (attemptCount < MAX_RETRIES) {
+      logger.warn(`All RPC endpoints failed. Retry attempt ${attemptCount} of ${MAX_RETRIES}`);
+      logger.info(`Waiting ${RETRY_DELAY_MS / 1000} seconds before retry...`);
+      await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+    } else {
+      logger.error('All RPC endpoints failed after maximum retry attempts');
+      throw new Error('Failed to send transaction after trying all available RPC endpoints');
+    }
+  }
+  
+  throw new Error('All transaction attempts failed');
 }
