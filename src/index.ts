@@ -18,10 +18,12 @@ async function main() {
 
   if (!keyFileExists()) {
     logger.info('No encrypted key file found. Setting up...');
-
-    logger.warn('\n⚠️  SECURITY WARNING ⚠️');
+    logger.info('------------------------');
+    logger.warn('⚠️  SECURITY WARNING ⚠️');
+    logger.info('------------------------');
     logger.warn('Make sure no one can see your screen');
-    logger.warn('Your private key will be encrypted, but it\'s sensitive during input');
+    logger.warn('Your private key will be encrypted');
+    logger.info('------------------------');
     logger.warn('Press Ctrl+C to cancel if you\'re in a public place\n');
 
     const response = await prompts({
