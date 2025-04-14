@@ -8,6 +8,7 @@ const FIRE_FUNCTION = "0x457094cc";
 const MAX_RETRIES = 3;
 const RETRY_DELAY_MS = 5000;
 const CONFIRMATION_TIMEOUT_MS = 180000;
+const DEFAULT_GAS = BigInt(100000);
 
 const RPC_ENDPOINTS = [
   { url: config.drpcEndpoint, name: "dRPC" },
@@ -15,7 +16,7 @@ const RPC_ENDPOINTS = [
 ];
 
 async function estimateGas(walletAddress: string, rpcUrl: string): Promise<bigint> {
-  try {
+  try { 
     const response = await fetch(rpcUrl, {
       method: 'POST',
       headers: {
@@ -39,17 +40,18 @@ async function estimateGas(walletAddress: string, rpcUrl: string): Promise<bigin
     
     if (result.error) {
       logger.warn(`Gas estimation error: ${JSON.stringify(result.error)}`);
-      throw new Error(`Gas estimation failed: ${result.error.message}`);
+      const bufferedDefault = DEFAULT_GAS * BigInt(110) / BigInt(100);
+      logger.warn(`Using default gas with 10% buffer: ${bufferedDefault}`);
+      return bufferedDefault;
     }
     
     const estimatedGas = BigInt(result.result);
     logger.info(`Estimated gas: ${estimatedGas}`);
-
     return estimatedGas;
   } catch (error) {
-    const defaultGas = BigInt(100000);
-    logger.warn(`Failed to estimate gas: ${error}. Using default: ${defaultGas}`);
-    return defaultGas;
+    const bufferedDefault = DEFAULT_GAS * BigInt(110) / BigInt(100);
+    logger.warn(`Failed to estimate gas: ${error}. Using default with 10% buffer: ${bufferedDefault}`);
+    return bufferedDefault;
   }
 }
 
