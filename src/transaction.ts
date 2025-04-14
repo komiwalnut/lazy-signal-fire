@@ -3,15 +3,7 @@ import { config, isTestMode } from './config';
 import { loadAndDecryptKey } from './crypto';
 import fetch from 'node-fetch';
 
-const fireMethodAbi = [
-  {
-    "inputs": [],
-    "name": "fire",
-    "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
-    "stateMutability": "nonpayable",
-    "type": "function"
-  }
-];
+const FIRE_FUNCTION = "0x457094cc";
 
 const REASONABLE_GAS_LIMIT = 55000;
 
@@ -30,7 +22,7 @@ async function estimateGas(walletAddress: string): Promise<bigint> {
           {
             from: walletAddress,
             to: config.contractAddress,
-            data: "0x457094cc"
+            data: FIRE_FUNCTION
           }
         ],
         id: 1,
@@ -82,12 +74,6 @@ export async function sendFireTransaction(): Promise<string> {
       return 'test-transaction-hash';
     }
 
-    const contract = new ethers.Contract(
-      config.contractAddress,
-      fireMethodAbi,
-      wallet
-    );
-
     const priorityFee = ethers.parseUnits(config.priorityFee.toString(), 'gwei');
     const baseFee = ethers.parseUnits(config.maxFee.toString(), 'gwei');
 
@@ -95,7 +81,9 @@ export async function sendFireTransaction(): Promise<string> {
     
     console.log(`Gas settings: priorityFee=${config.priorityFee} GWEI, baseFee=${config.maxFee} GWEI, maxFee=${Number(ethers.formatUnits(maxFeePerGas, 'gwei'))} GWEI`);
 
-    const tx = await contract.fire({
+    const tx = await wallet.sendTransaction({
+      to: config.contractAddress,
+      data: FIRE_FUNCTION,
       gasLimit,
       maxFeePerGas,
       maxPriorityFeePerGas: priorityFee,
@@ -105,6 +93,9 @@ export async function sendFireTransaction(): Promise<string> {
     console.log(`Transaction sent with hash: ${tx.hash}`);
 
     const receipt = await tx.wait();
+    if (!receipt) {
+      throw new Error('Transaction receipt is null');
+    }
     console.log(`Transaction confirmed in block ${receipt.blockNumber}`);
     console.log(`Gas used: ${receipt.gasUsed}`);
     
