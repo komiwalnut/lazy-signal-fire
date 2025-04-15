@@ -64,9 +64,9 @@ pnpm build
 pnpm start
 ```
 
-### Setting Up a Cron Job (on EC2)
+### Setting Up a Cron Job
 
-To run the script automatically every 13 hours:
+To run the script automatically every 13 hours in UTC time:
 
 1. Find your project's absolute path:
    ```
@@ -93,6 +93,7 @@ To run the script automatically every 13 hours:
    ```
    0 */13 * * * cd /home/ec2-user/lazy-signal-fire && /usr/local/bin/pnpm start >> /home/ec2-user/lazy-signal-fire/cron.log 2>&1
    ```
+   This will run the script at 00:00 UTC and 13:00 UTC every day (midnight and 1 PM UTC).
 
 5. Save and exit the editor:
    - For nano: Press Ctrl+O, then Enter, then Ctrl+X
