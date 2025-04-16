@@ -66,8 +66,7 @@ pnpm start
 
 ### Setting Up a Cron Job
 
-To run the script automatically every 13 hours in UTC time:
-
+To run the script automatically at 00:00 UTC and 13:00 UTC every day:
 1. Find your project's absolute path:
    ```
    pwd
@@ -87,13 +86,13 @@ To run the script automatically every 13 hours in UTC time:
 
 4. Add the following line (replace with your actual paths from steps 1 and 2):
    ```
-   0 */13 * * * cd /path/to/lazy-signal-fire && /path/to/pnpm start >> /path/to/lazy-signal-fire/cron.log 2>&1
+   0 0,13 * * * cd /path/to/lazy-signal-fire && /path/to/pnpm start >> /path/to/lazy-signal-fire/cron.log 2>&1
    ```
    Example:
    ```
-   0 */13 * * * cd /home/ec2-user/lazy-signal-fire && /usr/local/bin/pnpm start >> /home/ec2-user/lazy-signal-fire/cron.log 2>&1
+   0 0,13 * * * cd /home/ec2-user/lazy-signal-fire && /usr/local/bin/pnpm start >> /home/ec2-user/lazy-signal-fire/cron.log 2>&1
    ```
-   This will run the script at 00:00 UTC and 13:00 UTC every day (midnight and 1 PM UTC).
+   This will run the script at exactly 00:00 UTC and 13:00 UTC every day.
 
 5. Save and exit the editor:
    - For nano: Press Ctrl+O, then Enter, then Ctrl+X
@@ -104,4 +103,4 @@ To run the script automatically every 13 hours in UTC time:
    crontab -l
    ```
 
-This will run the script at minute 0 of every 13th hour (e.g., 12:00 AM, 1:00 PM) and save all output to `cron.log` in your project directory.
+This will run the script at minute 0 of hours 0 and 13 (12:00 AM, 1:00 PM UTC) and save all output to `cron.log` in your project directory.
